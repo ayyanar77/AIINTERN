@@ -1,0 +1,91 @@
+# task4_mnist_cnn.py
+"""
+Task 4: Image Classification (CNN on MNIST)
+- Loads MNIST from tensorflow.keras.datasets
+- Builds a small convolutional network
+- Trains, evaluates, saves model
+"""
+
+import tensorflow as tf
+from tensorflow.keras import layers, models
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+
+def load_and_preprocess():
+    (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
+    # Normalize and reshape to (H, W, 1)
+    x_train = x_train.astype("float32") / 255.0
+    x_test = x_test.astype("float32") / 255.0
+    x_train = np.expand_dims(x_train, -1)
+    x_test = np.expand_dims(x_test, -1)
+    return (x_train, y_train), (x_test, y_test)
+
+def build_model(input_shape=(28,28,1), num_classes=10):
+    model = models.Sequential([
+        layers.Conv2D(32, (3,3), activation="relu", input_shape=input_shape),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D((2,2)),
+        layers.Conv2D(64, (3,3), activation="relu"),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D((2,2)),
+        layers.Flatten(),
+        layers.Dense(128, activation="relu"),
+        layers.Dropout(0.4),
+        layers.Dense(num_classes, activation="softmax")
+    ])
+    model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+    return model
+
+def main():
+    (x_train, y_train), (x_test, y_test) = load_and_preprocess()
+
+    model = build_model()
+    model.summary()
+
+    callbacks = [
+        tf.keras.callbacks.ModelCheckpoint("mnist_cnn_best.h5", save_best_only=True, monitor="val_accuracy"),
+        tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True)
+    ]
+
+    history = model.fit(x_train, y_train, epochs=15, batch_size=128, validation_split=0.1, callbacks=callbacks)
+
+    test_loss, test_acc = model.evaluate(x_test, y_test, verbose=2)
+    print(f"Test accuracy: {test_acc:.4f}")
+
+    # Save whole model
+    model.save("mnist_cnn_model")
+
+    # Plot training history
+    plt.figure(figsize=(10,4))
+    plt.subplot(1,2,1)
+    plt.plot(history.history['loss'], label='train_loss')
+    plt.plot(history.history['val_loss'], label='val_loss')
+    plt.title("Loss")
+    plt.legend()
+
+    plt.subplot(1,2,2)
+    plt.plot(history.history['accuracy'], label='train_acc')
+    plt.plot(history.history['val_accuracy'], label='val_acc')
+    plt.title("Accuracy")
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig("mnist_training_history.png")
+    print("Saved mnist_training_history.png")
+    
+    # Show a few predictions
+    preds = model.predict(x_test[:12])
+    pred_labels = np.argmax(preds, axis=1)
+    plt.figure(figsize=(12,3))
+    for i in range(12):
+        plt.subplot(2,6,i+1)
+        plt.imshow(x_test[i].squeeze(), cmap="gray")
+        plt.title(f"pred:{pred_labels[i]}\ntrue:{y_test[i]}")
+        plt.axis("off")
+    plt.tight_layout()
+    plt.savefig("mnist_sample_predictions.png")
+    print("Saved mnist_sample_predictions.png")
+
+if __name__ == "__main__":
+    main()
