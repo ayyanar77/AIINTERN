@@ -1,0 +1,108 @@
+# task1_preprocessing.py
+"""
+Task 1: Data Preprocessing
+- Load dataset (CSV)
+- Clean missing values
+- Feature engineering
+- Encode categorical features
+- Scale numeric features
+- Export processed dataset
+"""
+
+import pandas as pd
+import numpy as np
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+import os
+
+def load_titanic():
+    # Try to fetch dataset from seaborn if available, otherwise instruct user to place CSV.
+    try:
+        import seaborn as sns
+        df = sns.load_dataset("titanic")
+        # seaborn titanic has somewhat different column names but fine for demo
+    except Exception:
+        # Fallback: expect 'titanic.csv' in current directory
+        if not os.path.exists("titanic.csv"):
+            raise FileNotFoundError("Place a titanic.csv file in working directory or install seaborn.")
+        df = pd.read_csv("titanic.csv")
+    return df
+
+def preprocess(df):
+    df = df.copy()
+    # Select useful columns (common to many titanic versions)
+    cols = [c for c in ["survived","pclass","sex","age","sibsp","parch","fare","embarked","deck","class","who","adult_male","alone"] if c in df.columns]
+    df = df[cols]
+    
+    # Standardize column names
+    if "class" in df.columns and "pclass" in df.columns:
+        # keep pclass only
+        df = df.drop(columns=["class"])
+
+    # Example target if exists
+    target = "survived" if "survived" in df.columns else None
+
+    # Basic cleaning: trim strings, unify missing placeholders
+    for col in df.select_dtypes(include=["object"]).columns:
+        df[col] = df[col].astype(str).str.strip().replace({"nan": np.nan, "None": np.nan, "": np.nan})
+
+    # Feature engineering example: family size
+    if set(["sibsp","parch"]).issubset(df.columns):
+        df["family_size"] = df["sibsp"].fillna(0).astype(float) + df["parch"].fillna(0).astype(float)
+
+    # Separate features
+    X = df.drop(columns=[target]) if target else df.copy()
+    y = df[target] if target else None
+
+    # Identify numeric and categorical features
+    numeric_features = X.select_dtypes(include=[np.number]).columns.tolist()
+    categorical_features = X.select_dtypes(include=["object","category","bool"]).columns.tolist()
+
+    # Create pipelines
+    numeric_transformer = Pipeline(steps=[
+        ("imputer", SimpleImputer(strategy="median")),
+        ("scaler", StandardScaler())
+    ])
+
+    categorical_transformer = Pipeline(steps=[
+        ("imputer", SimpleImputer(strategy="most_frequent")),
+        ("onehot", OneHotEncoder(sparse_output=False))
+    ])
+
+    preprocessor = ColumnTransformer(transformers=[
+        ("num", numeric_transformer, numeric_features),
+        ("cat", categorical_transformer, categorical_features)
+    ], remainder="drop")
+
+    # Fit and transform
+    X_processed = preprocessor.fit_transform(X)
+
+    # Column names after one-hot
+    cat_cols = []
+    if categorical_features:
+        ohe = preprocessor.named_transformers_["cat"].named_steps["onehot"]
+        cat_cols = ohe.get_feature_names_out(categorical_features).tolist()
+    processed_cols = numeric_features + cat_cols
+
+    X_processed_df = pd.DataFrame(X_processed, columns=processed_cols, index=X.index)
+
+    # Reattach target if present
+    if y is not None:
+        final_df = pd.concat([X_processed_df, y.reset_index(drop=True)], axis=1)
+    else:
+        final_df = X_processed_df
+
+    return final_df, preprocessor
+
+def main():
+    df = load_titanic()
+    processed_df, preproc = preprocess(df)
+    processed_df.to_csv("titanic_processed.csv", index=False)
+    print("Saved processed dataset to titanic_processed.csv")
+    print("Preview:")
+    print(processed_df.head())
+
+if __name__ == "__main__":
+    main()
