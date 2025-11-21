@@ -1,0 +1,115 @@
+import nltk
+import random
+import pandas as pd
+import spacy
+from nltk.sentiment import SentimentIntensityAnalyzer
+from nltk.corpus import movie_reviews
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, accuracy_score
+
+# -----------------------------------------------------
+# Ensure NLTK data is downloaded
+# -----------------------------------------------------
+nltk.download("vader_lexicon")
+nltk.download("punkt")
+nltk.download("movie_reviews")
+
+# -----------------------------------------------------
+# VADER SENTIMENT
+# -----------------------------------------------------
+def vader_demo(texts):
+    sia = SentimentIntensityAnalyzer()
+    results = []
+    for t in texts:
+        s = sia.polarity_scores(t)
+        results.append({"text": t, **s})
+    return pd.DataFrame(results)
+
+# -----------------------------------------------------
+# Supervised Sentiment Model (movie_reviews)
+# -----------------------------------------------------
+def train_supervised_from_nltk():
+    docs = [
+        (movie_reviews.raw(fileid), category)
+        for category in movie_reviews.categories()
+        for fileid in movie_reviews.fileids(category)
+    ]
+
+    random.shuffle(docs)
+
+    texts = [text for text, label in docs]
+    labels = [1 if label == "pos" else 0 for text, label in docs]
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        texts, labels, test_size=0.2, random_state=42
+    )
+
+    model = Pipeline([
+        ("tfidf", TfidfVectorizer(max_features=15000, ngram_range=(1,2))),
+        ("clf", LogisticRegression(max_iter=1200))
+    ])
+
+    print("Training supervised sentiment classifier...")
+    model.fit(X_train, y_train)
+
+    preds = model.predict(X_test)
+    print("Accuracy:", accuracy_score(y_test, preds))
+    print(classification_report(y_test, preds))
+
+    return model
+
+# -----------------------------------------------------
+# spaCy Cleaning
+# -----------------------------------------------------
+def clean_text_spacy(text, nlp):
+    doc = nlp(text)
+    tokens = [
+        token.lemma_.lower()
+        for token in doc
+        if not (token.is_stop or token.is_punct or token.is_space or token.like_num)
+    ]
+    return " ".join(tokens)
+
+def demo_spacy_preprocessing(texts):
+    try:
+        nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+    except:
+        print("Downloading spaCy model...")
+        import os
+        os.system("python -m spacy download en_core_web_sm")
+        nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+
+    return [clean_text_spacy(t, nlp) for t in texts]
+
+# -----------------------------------------------------
+# MAIN
+# -----------------------------------------------------
+def main():
+    sample_texts = [
+        "I love this product! It exceeded my expectations.",
+        "This is the worst experience I've had. Terrible!",
+        "It's okay — not great, not awful."
+    ]
+
+    print("\n--- VADER Sentiment Demo ---")
+    print(vader_demo(sample_texts))
+
+    print("\n--- Training Supervised Sentiment Model ---")
+    clf = train_supervised_from_nltk()
+
+    print("\nSupervised predictions:")
+    print(clf.predict(sample_texts))
+    print(clf.predict_proba(sample_texts))
+
+    print("\n--- spaCy Preprocessing Demo ---")
+    cleaned = demo_spacy_preprocessing(sample_texts)
+    for original, cleaned_text in zip(sample_texts, cleaned):
+        print("Original:", original)
+        print("Cleaned:", cleaned_text)
+        print("---")
+
+if __name__ == "__main__":
+    main()
