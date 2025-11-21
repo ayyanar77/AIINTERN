@@ -1,0 +1,15 @@
+dataset.csv (Sample Data for Internship Tasks)
+
+Below is a clean, multi-column dataset commonly used for preprocessing + ML tasks.
+
+id,name,age,gender,income,education,city,purchase_amount,feedback
+1,Ananya,23,Female,45000,Bachelor,Mumbai,1200,Very good product
+2,Rahul,31,Male,52000,Master,Delhi,800,Quality could be better
+3,Simran,27,Female,,Bachelor,Bangalore,1500,Absolutely loved it
+4,Amit,45,Male,61000,PhD,Kolkata,,Not satisfied with delivery
+5,Sneha,29,Female,48000,Master,Chennai,950,Good value for money
+6,Vikram,35,Male,70000,Bachelor,Pune,2000,Excellent service
+7,Priya,22,Female,40000,,Delhi,500,Average experience
+8,Karan,40,Male,82000,Master,Mumbai,3200,Highly recommended
+9,Meera,33,Female,55000,Bachelor,Hyderabad,2100,Will buy again
+10,Sachin,30,Male,,Bachelor,Chennai,1100,The product arrived damage
